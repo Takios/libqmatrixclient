@@ -62,8 +62,8 @@ namespace QMatrixClient
 
     /**
      * Finds a place in the timeline where a new event/message could be inserted.
-     * @return an iterator to an item with the earliest timestamp after
-     * the one of 'item'; or timeline.end(), if all events are earlier
+     * @return an iterator to an item with the latest timestamp before
+     * the one of 'item'; or timeline.end(), if all events are later.
      */
     template <class ItemT, class ContT>
     typename ContT::iterator
@@ -71,7 +71,7 @@ namespace QMatrixClient
     {
         return std::lower_bound (timeline.begin(), timeline.end(), item,
             [](const typename ContT::value_type a, const ItemT * b) {
-                return a->timestamp() < b->timestamp();
+                return a->timestamp() > b->timestamp();
             }
         );
     }
