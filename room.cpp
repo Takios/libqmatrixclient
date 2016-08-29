@@ -47,7 +47,11 @@ class Room::Private
         /** Map of user names to users. User names potentially duplicate, hence a multi-hashmap. */
         typedef QMultiHash<QString, User*> members_map_t;
         
-        Private(Room* parent): q(parent) {}
+        Private()
+            : q(nullptr), connection(nullptr), joinState(JoinState::Join)
+            , highlightCount(0), notificationCount(0), roomMessagesJob(nullptr)
+            , noEarlierEvents(false)
+        { }
 
         Room* q;
 
@@ -73,6 +77,7 @@ class Room::Private
         QHash<User*, QString> lastReadEvent;
         QString prevBatch;
         RoomMessagesJob* roomMessagesJob;
+        bool noEarlierEvents;
         
         // Convenience methods to work with the membersMap and usersLeft.
         // addMember() and removeMember() emit respective Room:: signals
@@ -96,15 +101,12 @@ class Room::Private
 };
 
 Room::Room(Connection* connection, QString id)
-    : QObject(connection), d(new Private(this))
+    : QObject(connection), d(new Private())
 {
     d->id = id;
     d->connection = connection;
-    d->joinState = JoinState::Join;
-    d->roomMessagesJob = nullptr;
+    d->q = this; // Private object initialization finished
     qDebug() << "New Room:" << id;
-
-    //connection->getMembers(this); // I don't think we need this anymore in r0.0.1
 }
 
 Room::~Room()
@@ -160,6 +162,11 @@ void Room::setJoinState(JoinState state)
         return;
     d->joinState = state;
     emit joinStateChanged(oldState, state);
+}
+
+bool Room::noEarlierEvents() const
+{
+    return d->noEarlierEvents;
 }
 
 void Room::markMessageAsRead(Event* event)
@@ -382,6 +389,7 @@ void Room::Private::getPreviousContent()
         connect( roomMessagesJob, &RoomMessagesJob::result, [=]() {
             if( !roomMessagesJob->error() )
             {
+                noEarlierEvents = roomMessagesJob->events().empty();
                 for( Event* event: roomMessagesJob->events() )
                 {
                     messageEvents.push_front(event);
