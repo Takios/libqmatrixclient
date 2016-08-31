@@ -57,7 +57,7 @@ class Room::Private
         void updateDisplayname();
 
         Connection* connection;
-        QList<Event*> messageEvents;
+        Timeline messageEvents;
         QString id;
         QStringList aliases;
         QString canonicalAlias;
@@ -118,7 +118,7 @@ QString Room::id() const
     return d->id;
 }
 
-QList< Event* > Room::messageEvents() const
+Room::Timeline Room::messageEvents() const
 {
     return d->messageEvents;
 }
@@ -339,13 +339,17 @@ void Room::updateData(const SyncRoomData& data)
         processStateEvent(stateEvent);
     }
 
-    for( Event* timelineEvent: data.timeline )
+    if (!data.timeline.empty())
     {
-
-        processMessageEvent(timelineEvent);
-        emit newMessage(timelineEvent);
-        // State changes can arrive in a timeline event - try to check those.
-        processStateEvent(timelineEvent);
+        d->messageEvents.insert(d->messageEvents.begin(),
+            data.timeline.begin(), data.timeline.end());
+        for( Event* e: data.timeline )
+        {
+            processMessageEvent(e);
+            // State changes can arrive in a timeline event - try to check those.
+            processStateEvent(e);
+        }
+        emit gotNewMessages(data.timeline);
     }
 
     for( Event* ephemeralEvent: data.ephemeral )
@@ -380,10 +384,11 @@ void Room::Private::getPreviousContent()
             {
                 for( Event* event: roomMessagesJob->events() )
                 {
+                    messageEvents.push_front(event);
                     q->processMessageEvent(event);
-                    emit q->newMessage(event);
                 }
                 prevBatch = roomMessagesJob->end();
+                emit q->gotOlderMessages(roomMessagesJob->events());
             }
             roomMessagesJob = nullptr;
         });
@@ -395,9 +400,13 @@ Connection* Room::connection() const
     return d->connection;
 }
 
+void Room::processNewMessageEvents(const Events& events)
+{
+}
+
 void Room::processMessageEvent(Event* event)
 {
-    d->messageEvents.insert(findInsertionPos(d->messageEvents, event), event);
+//    d->messageEvents.insert(findInsertionPos(d->messageEvents, event), event);
 }
 
 void Room::processStateEvent(Event* event)

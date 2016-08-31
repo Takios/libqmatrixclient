@@ -27,6 +27,8 @@
 #include "jobs/syncjob.h"
 #include "joinstate.h"
 
+#include <deque>
+
 namespace QMatrixClient
 {
     class Event;
@@ -37,11 +39,13 @@ namespace QMatrixClient
     {
             Q_OBJECT
         public:
+            using Timeline = std::deque<Event*>;
+
             Room(Connection* connection, QString id);
             virtual ~Room();
 
             Q_INVOKABLE QString id() const;
-            Q_INVOKABLE QList<Event*> messageEvents() const;
+            Q_INVOKABLE Timeline messageEvents() const;
             Q_INVOKABLE QString name() const;
             Q_INVOKABLE QStringList aliases() const;
             Q_INVOKABLE QString canonicalAlias() const;
@@ -80,7 +84,8 @@ namespace QMatrixClient
             void userRenamed(User* user, QString oldName);
 
         signals:
-            void newMessage(Event* event);
+            void gotOlderMessages(const Events& event);
+            void gotNewMessages(const Events& event);
             /**
              * Triggered when the room name, canonical alias or other aliases
              * change. Not triggered when displayname changes.
@@ -99,6 +104,8 @@ namespace QMatrixClient
 
         protected:
             Connection* connection() const;
+            virtual void processNewMessageEvents(const Events& events);
+            /** @deprecated: doesn't order messages properly */
             virtual void processMessageEvent(Event* event);
             virtual void processStateEvent(Event* event);
             virtual void processEphemeralEvent(Event* event);
